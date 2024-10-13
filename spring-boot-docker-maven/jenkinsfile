@@ -1,0 +1,104 @@
+pipeline {
+    agent {
+        label 'maven-host'
+    }
+    
+    tools {
+        maven 'MavenTool'  // Ensure this is configured in Jenkins
+    }
+
+    environment {
+        SCANNER_HOME = tool 'sonar-scanner'  // SonarQube scanner tool configured in Jenkins
+    }
+
+    stages {
+        stage('Checkout Code') {
+            steps {
+                checkout([
+                    $class: 'GitSCM', 
+                    branches: [[name: '*/main']],
+                    doGenerateSubmoduleConfigurations: false, 
+                    extensions: [], 
+                    userRemoteConfigs: [[url: 'https://github.com/joehaddy07/spring-boot-docker-maven.git']]
+                ])
+            }
+        }
+
+        stage('Build with Maven') {
+            steps {
+                script {
+                    dir('spring-boot-docker-maven') {  // Adjust path to where pom.xml is located
+                        sh 'mvn clean install'
+                    }
+                }
+            }
+        }
+
+        stage('SonarQube Analysis') {
+            steps {
+                withSonarQubeEnv('Sonar-server') {  // Use the SonarQube server installation name
+                    // Run SonarQube analysis using the scanner
+                    
+                    sh '''
+                        $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=SpringBootAppsDevOps \
+                       -Dsonar.java.binaries=. \
+                    '''
+                }
+            }
+        }
+
+        stage('Check Dockerfile') {
+            steps {
+                dir('SpringBootApps') {
+                // some block
+                script {
+                    if (fileExists(env.DOCKERFILE)) {
+                        echo "Dockerfile exists: ${env.DOCKERFILE}"
+                    } else {
+                        error "Dockerfile does not exist: ${env.DOCKERFILE}"
+                    }
+                }
+
+               }
+            }
+        }
+
+
+        stage('Build Docker Image') {
+            steps {
+                script {
+                    // Build Docker image
+                    sh 'docker build -t joehaddy/springbootdemo:v1 .'
+                }
+            }
+        }
+
+        stage('Push Docker Image To Docker Hub') {
+            steps {
+                script {
+                    withCredentials([usernamePassword(credentialsId: 'Docker-Hub', 
+                    passwordVariable: 'DockerPassWord', 
+                    usernameVariable: 'DockerUserName')]) {
+                        // Login to Docker Hub
+                        sh 'echo $DockerPassWord | docker login -u $DockerUserName --password-stdin'
+                        
+                        // Push image to Docker Hub
+                        sh 'docker push joehaddy/springbootdemo:v1 .'
+                        
+                        // Logout from Docker Hub
+                        sh 'docker logout'
+                    }
+                }
+            }
+        }
+    }
+
+    post {
+        success {
+            echo 'Build succeeded!'
+        }
+        failure {
+            echo 'Build failed!'
+        }
+    }
+}
