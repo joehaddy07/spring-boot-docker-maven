@@ -1,20 +1,13 @@
 package com.javatechie.docker.api;
 
-import org.springframework.boot.SpringApplication;
-import org.springframework.boot.autoconfigure.SpringBootApplication;
-import org.springframework.web.bind.annotation.GetMapping;
-import org.springframework.web.bind.annotation.RestController;
+import org.junit.jupiter.api.Test;
+import org.springframework.boot.test.context.SpringBootTest;
 
-@SpringBootApplication
-@RestController
-public class SpringBootDockerMavenApplication {
+@SpringBootTest
+class SpringBootDockerMavenApplicationTests {
 
-    public static void main(String[] args) {
-        SpringApplication.run(SpringBootDockerMavenApplication.class, args);
-    }
-
-    @GetMapping("/get")
-    public String getMessage() {
-        return "Lord Thank You For Blessing My Skills. Your Humble Servant Joseph Haddison";
+    @Test
+    void contextLoads() {
+        // Test case to ensure the application context loads properly
     }
 }
