@@ -9,6 +9,7 @@ pipeline {
 
     environment {
         SCANNER_HOME = tool 'sonar-scanner'  // SonarQube scanner tool configured in Jenkins
+        DOCKERFILE = 'spring-boot-docker-maven/Dockerfile'  // Set the path to the Dockerfile
     }
 
     stages {
@@ -37,8 +38,6 @@ pipeline {
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('Sonar-server') {  // Use the SonarQube server installation name
-                    // Run SonarQube analysis using the scanner
-                    
                     sh '''
                         $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=SpringBootAppsDevOps \
                        -Dsonar.java.binaries=. \
@@ -49,26 +48,21 @@ pipeline {
 
         stage('Check Dockerfile') {
             steps {
-                dir('spring-boot-docker-maven') {
-                // some block
                 script {
                     if (fileExists(env.DOCKERFILE)) {
-                        echo "Dockerfile exists: ${env.DOCKERFILE}"
+                        echo "Dockerfile exists at: ${env.DOCKERFILE}"
                     } else {
-                        error "Dockerfile does not exist: ${env.DOCKERFILE}"
+                        error "Dockerfile does not exist at: ${env.DOCKERFILE}"
                     }
                 }
-
-               }
             }
         }
-
 
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Build Docker image
-                    sh 'docker build -t joehaddy/springbootdemo:v1 .'
+                    // Build Docker image with Dockerfile path specified
+                    sh 'docker build -t joehaddy/springbootdemo:v1 -f spring-boot-docker-maven/Dockerfile spring-boot-docker-maven/'
                 }
             }
         }
@@ -83,7 +77,7 @@ pipeline {
                         sh 'echo $DockerPassWord | docker login -u $DockerUserName --password-stdin'
                         
                         // Push image to Docker Hub
-                        sh 'docker push joehaddy/springbootdemo:v1 .'
+                        sh 'docker push joehaddy/springbootdemo:v1'
                         
                         // Logout from Docker Hub
                         sh 'docker logout'
