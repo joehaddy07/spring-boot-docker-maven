@@ -18,4 +18,3 @@ public class SpringBootDockerMavenApplication {
         return "Lord Thank You For Blessing My Skills. Your Humble Servant Joseph Haddison";
     }
 }
-
