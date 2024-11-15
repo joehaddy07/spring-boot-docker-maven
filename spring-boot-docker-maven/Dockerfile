@@ -1,5 +1,5 @@
 # Use official OpenJDK image as the base image
-FROM openjdk:21
+FROM openjdk:24-jdk
 
 # Maintainer details
 LABEL Maintainer="Joseph Haddison" \

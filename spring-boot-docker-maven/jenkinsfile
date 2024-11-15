@@ -2,16 +2,26 @@ pipeline {
     agent {
         label 'maven-host'
     }
-    
+    parameters {
+        string(name: 'BUILD_RETENTION_DAYS', defaultValue: '7', description: 'Days to keep builds')
+        string(name: 'ARTIFACT_RETENTION_DAYS', defaultValue: '2', description: 'Days to keep artifacts')
+    }
+    options {
+        buildDiscarder(logRotator(daysToKeepStr: "${params.BUILD_RETENTION_DAYS}", artifactDaysToKeepStr: "${params.ARTIFACT_RETENTION_DAYS}"))
+        quietPeriod(20)
+        timestamps()
+    }
     tools {
         maven 'MavenTool'  // Ensure this is configured in Jenkins
     }
-
     environment {
         SCANNER_HOME = tool 'sonar-scanner'  // SonarQube scanner tool configured in Jenkins
         DOCKERFILE = 'spring-boot-docker-maven/Dockerfile'  // Set the path to the Dockerfile
+        IMAGE_NAME = 'joehaddy/springbootdemo'  // Docker image name
+        IMAGE_TAG = 'v1'  // Version tag
+        DOCKER_HUB_REPO = 'https://hub.docker.com'  // Docker Hub repository
+        
     }
-
     stages {
         stage('Checkout Code') {
             steps {
@@ -24,7 +34,6 @@ pipeline {
                 ])
             }
         }
-
         stage('Build with Maven') {
             steps {
                 script {
@@ -34,18 +43,16 @@ pipeline {
                 }
             }
         }
-
         stage('SonarQube Analysis') {
             steps {
                 withSonarQubeEnv('Sonar-server') {  // Use the SonarQube server installation name
                     sh '''
                         $SCANNER_HOME/bin/sonar-scanner -Dsonar.projectKey=SpringBootAppsDevOps \
-                       -Dsonar.java.binaries=. \
+                       -Dsonar.java.binaries=.
                     '''
                 }
             }
         }
-
         stage('Check Dockerfile') {
             steps {
                 script {
@@ -57,15 +64,32 @@ pipeline {
                 }
             }
         }
-
         stage('Build Docker Image') {
             steps {
                 script {
-                    // Build Docker image with Dockerfile path specified
-                    sh 'docker build -t joehaddy/springbootdemo:v1 -f spring-boot-docker-maven/Dockerfile spring-boot-docker-maven/'
+                    sh "docker build -t ${IMAGE_NAME}:${IMAGE_TAG} -f ${DOCKERFILE} spring-boot-docker-maven/"
                 }
             }
         }
+        
+        stage('Trivy Scan') {
+    steps {
+        script {
+            withCredentials([usernamePassword(credentialsId: 'github-token', 
+                                           passwordVariable: 'GITHUB_TOKEN', 
+                                           usernameVariable: 'GITHUB_USER')]) {
+                // Set up authentication
+                sh """
+                    export GITHUB_TOKEN=${GITHUB_TOKEN}
+                    trivy image \
+                    --exit-code 1 \
+                    --severity HIGH,CRITICAL \
+                    ${IMAGE_NAME}:${IMAGE_TAG}
+                """
+            }
+        }
+    }
+}
 
         stage('Push Docker Image To Docker Hub') {
             steps {
@@ -73,26 +97,23 @@ pipeline {
                     withCredentials([usernamePassword(credentialsId: 'Docker-Hub', 
                     passwordVariable: 'DockerPassWord', 
                     usernameVariable: 'DockerUserName')]) {
-                        // Login to Docker Hub
                         sh 'echo $DockerPassWord | docker login -u $DockerUserName --password-stdin'
-                        
-                        // Push image to Docker Hub
-                        sh 'docker push joehaddy/springbootdemo:v1'
-                        
-                        // Logout from Docker Hub
+                        sh "docker push ${IMAGE_NAME}:${IMAGE_TAG}"
                         sh 'docker logout'
                     }
                 }
             }
         }
     }
-
     post {
         success {
             echo 'Build succeeded!'
         }
         failure {
             echo 'Build failed!'
+        }
+        always {
+            cleanWs()
         }
     }
 }
